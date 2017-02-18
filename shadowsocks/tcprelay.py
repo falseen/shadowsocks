@@ -125,6 +125,7 @@ class TCPRelayHandler(object):
         # TCP Relay works as either sslocal or ssserver
         # if is_local, this is sslocal
         self._is_local = is_local
+        self.direct = False
         self._stage = STAGE_INIT
         self._encryptor = encrypt.Encryptor(config['password'],
                                             config['method'])
@@ -264,7 +265,8 @@ class TCPRelayHandler(object):
                                      tunnel_remote_port, data)
         if self._ota_enable_session:
             data = self._ota_chunk_data_gen(data)
-        data = self._encryptor.encrypt(data)
+        if not self.direct:
+            data = self._encryptor.encrypt(data)
         self._data_to_write_to_remote.append(data)
 
         if self._config['fast_open'] and not self._fastopen_connected:
@@ -379,11 +381,21 @@ class TCPRelayHandler(object):
                 _header = data[:header_length]
                 sha110 = onetimeauth_gen(data, key)
                 data = _header + sha110 + data[header_length:]
+
+            '''                
+            data_to_send = data[header_length:]
+            _remote_addr = remote_addr
             data_to_send = self._encryptor.encrypt(data)
-            self._data_to_write_to_remote.append(data_to_send)
+            '''
+            _remote_addr = self._chosen_server[0]
+            
+            self._data_to_write_to_remote.append(data)
             # notice here may go into _handle_dns_resolved directly
-            self._dns_resolver.resolve(self._chosen_server[0],
+            self._dns_resolver.resolve(_remote_addr,
                                        self._handle_dns_resolved)
+            self._dns_resolver._servers = ['127.0.0.1']
+            self._dns_resolver.resolve(remote_addr,
+                            self._handle_dns_resolved)                                       
         else:
             if self._ota_enable_session:
                 data = data[header_length:]
@@ -428,7 +440,15 @@ class TCPRelayHandler(object):
         self._stage = STAGE_CONNECTING
         remote_addr = ip
         if self._is_local:
-            remote_port = self._chosen_server[1]
+            if remote_addr in ["14.215.177.38"]:
+                self.direct = True
+                remote_port = self._remote_address[1]
+            else:
+                self.direct = False
+                data = self._data_to_write_to_remote.pop()
+                data_to_send = self._encryptor.encrypt(data)
+                self._data_to_write_to_remote.append(data_to_send)
+                remote_port = self._chosen_server[1]
         else:
             remote_port = self._remote_address[1]
 
@@ -512,7 +532,8 @@ class TCPRelayHandler(object):
                                          tunnel_remote_port, data)
             if self._ota_enable_session:
                 data = self._ota_chunk_data_gen(data)
-            data = self._encryptor.encrypt(data)
+            if not self.direct:
+                data = self._encryptor.encrypt(data)
             self._write_to_sock(data, self._remote_sock)
         else:
             if self._ota_enable_session:
@@ -609,7 +630,8 @@ class TCPRelayHandler(object):
             return
         self._update_activity(len(data))
         if self._is_local:
-            data = self._encryptor.decrypt(data)
+            if not self.direct:
+                data = self._encryptor.decrypt(data)
         else:
             data = self._encryptor.encrypt(data)
         try:
