@@ -382,20 +382,10 @@ class TCPRelayHandler(object):
                 sha110 = onetimeauth_gen(data, key)
                 data = _header + sha110 + data[header_length:]
 
-            '''                
-            data_to_send = data[header_length:]
-            _remote_addr = remote_addr
-            data_to_send = self._encryptor.encrypt(data)
-            '''
-            _remote_addr = self._chosen_server[0]
-            
             self._data_to_write_to_remote.append(data)
-            # notice here may go into _handle_dns_resolved directly
-            self._dns_resolver.resolve(_remote_addr,
-                                       self._handle_dns_resolved)
             self._dns_resolver._servers = ['127.0.0.1']
             self._dns_resolver.resolve(remote_addr,
-                            self._handle_dns_resolved)                                       
+                            self._handle_dns_resolved)
         else:
             if self._ota_enable_session:
                 data = data[header_length:]
@@ -437,14 +427,28 @@ class TCPRelayHandler(object):
             return
 
         ip = result[1]
+        name = result[0]
         self._stage = STAGE_CONNECTING
         remote_addr = ip
         if self._is_local:
-            if remote_addr in ["14.215.177.38"]:
-                self.direct = True
-                remote_port = self._remote_address[1]
+            if not common.to_str(name) in common.to_str(self._chosen_server[0]):
+                if common.to_str(remote_addr) in ["14.215.177.38", "14.215.177.37"]:
+                    self.direct = True
+                    data = self._data_to_write_to_remote.pop()
+                    header_result = parse_header(data)
+                    header_length = header_result[-1]
+                    data = data[header_length:]
+                    self._data_to_write_to_remote.append(data)
+                    remote_port = self._remote_address[1]
+                else:
+                    self.direct = False
+                    # notice here may go into _handle_dns_resolved directly
+                    #self._dns_resolver._servers = ['114.114.114.114']
+                    self._dns_resolver.resolve(self._chosen_server[0],
+                                            self._handle_dns_resolved)
+                    # self._stage = STAGE_ADDR            
+                    return
             else:
-                self.direct = False
                 data = self._data_to_write_to_remote.pop()
                 data_to_send = self._encryptor.encrypt(data)
                 self._data_to_write_to_remote.append(data_to_send)
