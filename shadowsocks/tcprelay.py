@@ -431,31 +431,25 @@ class TCPRelayHandler(object):
         self._stage = STAGE_CONNECTING
         remote_addr = ip
         if self._is_local:
-            if not common.to_str(name) in common.to_str(self._chosen_server[0]):
-                if common.to_str(remote_addr) in ["14.215.177.38", "14.215.177.37"]:
-                    self.direct = True
-                    data = self._data_to_write_to_remote.pop()
-                    header_result = parse_header(data)
-                    header_length = header_result[-1]
-                    data = data[header_length:]
-                    self._data_to_write_to_remote.append(data)
-                    remote_port = self._remote_address[1]
-                else:
-                    self.direct = False
-                    # notice here may go into _handle_dns_resolved directly
-                    #self._dns_resolver._servers = ['114.114.114.114']
-                    self._dns_resolver.resolve(self._chosen_server[0],
-                                            self._handle_dns_resolved)
-                    # self._stage = STAGE_ADDR            
-                    return
+            if common.to_str(remote_addr) in ["14.215.177.38", "14.215.177.37"]:
+                self.direct = True
+                data = self._data_to_write_to_remote.pop()
+                header_result = parse_header(data)
+                header_length = header_result[-1]
+                data = data[header_length:]
+                self._data_to_write_to_remote.append(data)
+                remote_port = self._remote_address[1]
             else:
+                self.direct = False
+                # notice here may go into _handle_dns_resolved directly
+                # self._dns_resolver._servers = ['114.114.114.114']
+                remote_addr = self._chosen_server[0]
                 data = self._data_to_write_to_remote.pop()
                 data_to_send = self._encryptor.encrypt(data)
                 self._data_to_write_to_remote.append(data_to_send)
                 remote_port = self._chosen_server[1]
         else:
             remote_port = self._remote_address[1]
-
         if self._is_local and self._config['fast_open']:
             # for fastopen:
             # wait for more data arrive and send them in one SYN
