@@ -42,8 +42,10 @@ def main():
 
     logging.info("starting local at %s:%d" %
                  (config['local_address'], config['local_port']))
-
-    dns_resolver = asyncdns.DNSResolver()
+    if config.get("acl", False):
+        dns_resolver = asyncdns.DNSResolver(server_list=["127.0.0.1"], acl=True)
+    else:
+        dns_resolver = asyncdns.DNSResolver()
     tcp_server = tcprelay.TCPRelay(config, dns_resolver, True)
     udp_server = udprelay.UDPRelay(config, dns_resolver, True)
     loop = eventloop.EventLoop()
@@ -51,20 +53,23 @@ def main():
     tcp_server.add_to_loop(loop)
     udp_server.add_to_loop(loop)
     has_tunnel = False
-    # if both_tunnel_local is True then run tunnel_udp_server
-    if config["both_tunnel_local"]:
+    if config.get("acl", False):
+        tunnel_dns_resolver = asyncdns.DNSResolver()
         _config = config.copy()
         _config["local_port"] = _config["tunnel_port"]
+        _config["tunnel_remote"] = "8.8.4.4"
+        _config["tunnel_remote_port"] = 53
+        _config["local_port"] = 53
         logging.info("starting tcp tunnel at %s:%d forward to %s:%d" %
                      (_config['local_address'], _config['local_port'],
                       _config['tunnel_remote'], _config['tunnel_remote_port']))
-        tunnel_tcp_server = tcprelay.TCPRelay(_config, dns_resolver, True)
+        tunnel_tcp_server = tcprelay.TCPRelay(_config, tunnel_dns_resolver, True)
         tunnel_tcp_server.is_tunnel = True
         tunnel_tcp_server.add_to_loop(loop)
         logging.info("starting udp tunnel at %s:%d forward to %s:%d" %
                      (_config['local_address'], _config['local_port'],
                       _config['tunnel_remote'], _config['tunnel_remote_port']))
-        tunnel_udp_server = udprelay.UDPRelay(_config, dns_resolver, True)
+        tunnel_udp_server = udprelay.UDPRelay(_config, tunnel_dns_resolver, True)
         tunnel_udp_server.is_tunnel = True
         tunnel_udp_server.add_to_loop(loop)
         has_tunnel = True

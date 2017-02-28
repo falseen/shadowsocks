@@ -116,7 +116,12 @@ class TCPRelayHandler(object):
         self._remote_sock = None
         self._config = config
         self._dns_resolver = dns_resolver
-        self.both_tunnel_local = config.get('both_tunnel_local', False)
+        self.acl = config.get("acl", False)
+        if self.acl:
+            self._acl_network = dns_resolver._acl_network
+            self._witelist = dns_resolver._witelist
+        else:
+            self._witelist = self._acl_network = ""    
         self.tunnel_remote = config.get('tunnel_remote', "8.8.8.8")
         self.tunnel_remote_port = config.get('tunnel_remote_port', 53)
         self.tunnel_port = config.get('tunnel_port', 53)
@@ -340,9 +345,6 @@ class TCPRelayHandler(object):
         if header_result is None:
             raise Exception('can not parse header')
         addrtype, remote_addr, remote_port, header_length = header_result
-        logging.info('connecting %s:%d from %s:%d' %
-                     (common.to_str(remote_addr), remote_port,
-                      self._client_address[0], self._client_address[1]))
         if self._is_local is False:
             # spec https://shadowsocks.org/en/spec/one-time-auth.html
             self._ota_enable_session = addrtype & ADDRTYPE_AUTH
@@ -381,9 +383,11 @@ class TCPRelayHandler(object):
                 _header = data[:header_length]
                 sha110 = onetimeauth_gen(data, key)
                 data = _header + sha110 + data[header_length:]
-
+            new_remote_addr = reduce(lambda x,y: "%s.%s" %(x,y) ,remote_addr.split(".")[1:])
+            if new_remote_addr in self._witelist:
+                self.direct = False
+                remote_addr = self._chosen_server[0]
             self._data_to_write_to_remote.append(data)
-            self._dns_resolver._servers = ['127.0.0.1']
             self._dns_resolver.resolve(remote_addr,
                             self._handle_dns_resolved)
         else:
@@ -431,25 +435,34 @@ class TCPRelayHandler(object):
         self._stage = STAGE_CONNECTING
         remote_addr = ip
         if self._is_local:
-            if common.to_str(remote_addr) in ["14.215.177.38", "14.215.177.37"]:
+            direct_or_forward = ""
+            if common.to_str(remote_addr) in self._acl_network or not self.direct:
                 self.direct = True
+                direct_or_forward = "[direct]"
                 data = self._data_to_write_to_remote.pop()
                 header_result = parse_header(data)
                 header_length = header_result[-1]
                 data = data[header_length:]
                 self._data_to_write_to_remote.append(data)
+                remote_addr = self._remote_address[0]
                 remote_port = self._remote_address[1]
             else:
                 self.direct = False
+                direct_or_forward = "[forward]"
                 # notice here may go into _handle_dns_resolved directly
-                # self._dns_resolver._servers = ['114.114.114.114']
                 remote_addr = self._chosen_server[0]
                 data = self._data_to_write_to_remote.pop()
                 data_to_send = self._encryptor.encrypt(data)
                 self._data_to_write_to_remote.append(data_to_send)
                 remote_port = self._chosen_server[1]
+            logging.info('%s connecting %s:%d from %s:%d' %
+                    (direct_or_forward ,common.to_str(self._remote_address[0]), self._remote_address[1],
+                    self._client_address[0], self._client_address[1]))
         else:
             remote_port = self._remote_address[1]
+            logging.info('connecting %s:%d from %s:%d' %
+                    (common.to_str(remote_addr), remote_port,
+                    self._client_address[0], self._client_address[1]))    
         if self._is_local and self._config['fast_open']:
             # for fastopen:
             # wait for more data arrive and send them in one SYN
