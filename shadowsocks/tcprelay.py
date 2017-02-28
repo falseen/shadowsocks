@@ -379,8 +379,7 @@ class TCPRelayHandler(object):
                 data = _header + sha110 + data[header_length:]
             new_remote_addr = reduce(lambda x,y: "%s.%s" %(x,y) ,remote_addr.split(".")[1:])
             if new_remote_addr in self._witelist:
-                self.direct = False
-                remote_addr = self._chosen_server[0]
+                self.direct = True
             self._data_to_write_to_remote.append(data)
             self._dns_resolver.resolve(remote_addr,
                             self._handle_dns_resolved)
@@ -430,7 +429,7 @@ class TCPRelayHandler(object):
         remote_addr = ip
         if self._is_local:
             direct_or_forward = ""
-            if common.to_str(remote_addr) in self._acl_network or not self.direct:
+            if common.to_str(remote_addr) in self._acl_network or self.direct:
                 self.direct = True
                 direct_or_forward = "[direct]"
                 data = self._data_to_write_to_remote.pop()
