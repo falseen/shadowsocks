@@ -234,6 +234,7 @@ def is_valid_hostname(hostname):
 
 
 class DNSResponse(object):
+
     def __init__(self):
         self.hostname = None
         self.questions = []  # each: (addr, type, class)
@@ -277,9 +278,9 @@ class DNSResolver(object):
             acl_txt = f.read()
             proxy_all, bypass_witelist = acl_txt.split("[bypass_list]")
             bypass, witelist = bypass_witelist.split("[whitelist]")
-            proxy_all_list = proxy_all.replace("\n",",")
+            proxy_all_list = proxy_all.replace("\n", ",")
             bypass_list = bypass.replace("\n", ",")[1:]
-            witelist =  witelist.replace("\n", ",")
+            witelist = witelist.replace("\n", ",")
         return IPNetwork(bypass_list), witelist
 
     def _parse_resolv(self):
