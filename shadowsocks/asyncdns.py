@@ -25,6 +25,7 @@ import re
 import logging
 
 from shadowsocks import common, lru_cache, eventloop, shell
+from common import IPNetwork
 
 
 CACHE_SWEEP_INTERVAL = 30
@@ -248,7 +249,7 @@ STATUS_SECOND = 1
 
 class DNSResolver(object):
 
-    def __init__(self, server_list=None, prefer_ipv6=False):
+    def __init__(self, server_list=None, prefer_ipv6=False, acl=False):
         self._loop = None
         self._hosts = {}
         self._hostname_status = {}
@@ -256,6 +257,8 @@ class DNSResolver(object):
         self._cb_to_hostname = {}
         self._cache = lru_cache.LRUCache(timeout=300)
         self._sock = None
+        if acl:
+            self._acl_network, self._witelist = self._get_acl_network()
         if server_list is None:
             self._servers = None
             self._parse_resolv()
@@ -268,6 +271,16 @@ class DNSResolver(object):
         self._parse_hosts()
         # TODO monitor hosts change and reload hosts
         # TODO parse /etc/gai.conf and follow its rules
+
+    def _get_acl_network(self):
+        with open("chn.acl", "r") as f:
+            acl_txt = f.read()
+            proxy_all, bypass_witelist = acl_txt.split("[bypass_list]")
+            bypass, witelist = bypass_witelist.split("[whitelist]")
+            proxy_all_list = proxy_all.replace("\n",",")
+            bypass_list = bypass.replace("\n", ",")[1:]
+            witelist =  witelist.replace("\n", ",")
+        return IPNetwork(bypass_list), witelist
 
     def _parse_resolv(self):
         self._servers = []
