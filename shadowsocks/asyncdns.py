@@ -274,7 +274,8 @@ class DNSResolver(object):
         # TODO parse /etc/gai.conf and follow its rules
 
     def _get_acl_network(self):
-        with open("chn.acl", "r") as f:
+        chn_path = os.path.join(os.path.dirname(__file__), '../', 'chn.acl')
+        with open(chn_path, "r") as f:
             acl_txt = f.read()
             proxy_all, bypass_witelist = acl_txt.split("[bypass_list]")
             bypass, witelist = bypass_witelist.split("[whitelist]")
