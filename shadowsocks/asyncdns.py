@@ -25,7 +25,6 @@ import re
 import logging
 
 from shadowsocks import common, lru_cache, eventloop, shell
-from common import IPNetwork
 
 
 CACHE_SWEEP_INTERVAL = 30
@@ -282,7 +281,7 @@ class DNSResolver(object):
             proxy_all_list = proxy_all.replace("\n", ",")
             bypass_list = bypass.replace("\n", ",")[1:]
             witelist = witelist.replace("\n", ",")
-        return IPNetwork(bypass_list), witelist
+        return common.IPNetwork(bypass_list), witelist
 
     def _parse_resolv(self):
         self._servers = []
@@ -422,6 +421,16 @@ class DNSResolver(object):
             logging.debug('resolving %s with type %d using server %s',
                           hostname, qtype, server)
             self._sock.sendto(req, (server, 53))
+
+    def resolve_acl(self, hostname, callback):
+        new_hostname = hostname.split(".")
+        if len(new_hostname) >= 2:
+            new_hostname = new_hostname[-2:]
+        new_hostname = reduce(lambda x, y: "%s.%s" % (x, y), new_hostname)
+        if new_hostname in self._witelist:
+            callback((hostname, hostname), None, direct = True)
+        else:
+            self.resolve(hostname, callback)
 
     def resolve(self, hostname, callback):
         if type(hostname) != bytes:

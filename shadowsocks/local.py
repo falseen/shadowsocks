@@ -57,8 +57,9 @@ def main():
     if config.get("acl", False):
         tunnel_dns_resolver = asyncdns.DNSResolver()
         _config = config.copy()
-        _config["local_port"] = _config["tunnel_port"]
-        _config["tunnel_remote"] = "8.8.4.4"
+        _config["acl"] = False
+        _config["local_port"] = config["tunnel_port"]
+        _config["tunnel_remote"] = "8.8.8.8"
         _config["tunnel_remote_port"] = 53
         _config["local_port"] = 53
         logging.info("starting tcp tunnel at %s:%d forward to %s:%d" %
