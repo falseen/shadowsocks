@@ -130,7 +130,7 @@ class TCPRelayHandler(object):
         # TCP Relay works as either sslocal or ssserver
         # if is_local, this is sslocal
         self._is_local = is_local
-        self.direct = False
+        self._direct = False
         self._stage = STAGE_INIT
         self._encryptor = encrypt.Encryptor(config['password'],
                                             config['method'])
@@ -264,7 +264,7 @@ class TCPRelayHandler(object):
             return
         if self._ota_enable_session:
             data = self._ota_chunk_data_gen(data)
-        if not self.direct:
+        if not self._direct:
             data = self._encryptor.encrypt(data)
         self._data_to_write_to_remote.append(data)
 
@@ -430,24 +430,21 @@ class TCPRelayHandler(object):
         remote_addr = ip
         if self._is_local:
             direct_or_forward = ""
-            self.direct = direct
-            if (self.acl and self.direct) or ip in self._acl_network:
+            self._direct = direct
+            if (self.acl and self._direct) or ip in self._acl_network:
+                self._direct = True
+                self._data_to_write_to_remote = []
                 direct_or_forward = "[direct]"
-                data = self._data_to_write_to_remote.pop()
-                header_result = parse_header(data)
-                header_length = header_result[-1]
-                data = data[header_length:]
-                self._data_to_write_to_remote.append(data)
                 remote_addr = self._remote_address[0]
                 remote_port = self._remote_address[1]
             else:
-                self.direct = False
+                self._direct = False
                 direct_or_forward = "[forward]"
                 # notice here may go into _handle_dns_resolved directly
                 remote_addr = self._chosen_server[0]
-                self._data_to_write_to_remote.pop()
+                self._data_to_write_to_remote = []
                 data = common.add_header(self._remote_address[0],
-                                         self._remote_address[1],b"")
+                                         self._remote_address[1])
 
                 data_to_send = self._encryptor.encrypt(data)
                 self._data_to_write_to_remote.append(data_to_send)
@@ -534,7 +531,7 @@ class TCPRelayHandler(object):
         if self._is_local:
             if self._ota_enable_session:
                 data = self._ota_chunk_data_gen(data)
-            if not self.direct:
+            if not self._direct:
                 data = self._encryptor.encrypt(data)
             self._write_to_sock(data, self._remote_sock)
         else:
@@ -603,14 +600,16 @@ class TCPRelayHandler(object):
             data = self._encryptor.decrypt(data)
             if not data:
                 return
-        # jump over socks5 init
-        if self.is_tunnel:
-            self._stage = STAGE_ADDR
         if self._stage == STAGE_STREAM:
             self._handle_stage_stream(data)
             return
         elif is_local and self._stage == STAGE_INIT:
-            self._handle_stage_init(data)
+            # jump over socks5 init
+            if self.is_tunnel:
+                self._handle_stage_addr(data)
+                return
+            else:
+                self._handle_stage_init(data)
         elif self._stage == STAGE_CONNECTING:
             self._handle_stage_connecting(data)
         elif (is_local and self._stage == STAGE_ADDR) or \
@@ -632,7 +631,7 @@ class TCPRelayHandler(object):
             return
         self._update_activity(len(data))
         if self._is_local:
-            if not self.direct:
+            if not self._direct:
                 data = self._encryptor.decrypt(data)
         else:
             data = self._encryptor.encrypt(data)
