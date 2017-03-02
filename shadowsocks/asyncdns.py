@@ -280,7 +280,8 @@ class DNSResolver(object):
             bypass, witelist = bypass_witelist.split("[whitelist]")
             proxy_all_list = proxy_all.replace("\n", ",")
             bypass_list = bypass.replace("\n", ",")[1:]
-            witelist = witelist.replace("\n", ",")
+            witelist = witelist.replace('','').split("\n")
+            witelist = set([x for x in witelist if x !=""])
         return common.IPNetwork(bypass_list), witelist
 
     def _parse_resolv(self):
