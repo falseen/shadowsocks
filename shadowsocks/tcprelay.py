@@ -377,7 +377,7 @@ class TCPRelayHandler(object):
                 _header = data[:header_length]
                 sha110 = onetimeauth_gen(data, key)
                 data = _header + sha110 + data[header_length:]
-            self._data_to_write_to_remote.append(data)
+            self._data_to_write_to_remote.append(data[header_length:])
             if self.acl:
                 self._dns_resolver.resolve_acl(remote_addr,
                                         self._handle_dns_resolved)
@@ -442,10 +442,10 @@ class TCPRelayHandler(object):
                 direct_or_forward = "[forward]"
                 # notice here may go into _handle_dns_resolved directly
                 remote_addr = self._chosen_server[0]
+                data = self._data_to_write_to_remote.pop()
                 self._data_to_write_to_remote = []
                 data = common.add_header(self._remote_address[0],
-                                         self._remote_address[1])
-
+                                         self._remote_address[1], data)
                 data_to_send = self._encryptor.encrypt(data)
                 self._data_to_write_to_remote.append(data_to_send)
                 remote_port = self._chosen_server[1]
