@@ -378,7 +378,7 @@ class TCPRelayHandler(object):
                 sha110 = onetimeauth_gen(data, key)
                 data = _header + sha110 + data[header_length:]
             self._data_to_write_to_remote.append(data[header_length:])
-            if self.acl:
+            if self.acl and not common.is_ip(remote_addr):
                 self._dns_resolver.resolve_acl(remote_addr,
                                         self._handle_dns_resolved)
             else:
@@ -431,7 +431,7 @@ class TCPRelayHandler(object):
         if self._is_local:
             direct_or_forward = ""
             self._direct = direct
-            if (self.acl and self._direct) or ip in self._acl_network:
+            if (self.acl and self._direct) or common.to_str(ip) in self._acl_network:
                 self._direct = True
                 self._data_to_write_to_remote = []
                 direct_or_forward = "[direct]"

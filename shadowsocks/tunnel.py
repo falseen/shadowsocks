@@ -43,6 +43,7 @@ def main():
     loop = eventloop.EventLoop()
     dns_resolver.add_to_loop(loop)
     _config = config.copy()
+    _config["acl"] = False
     _config["local_port"] = _config["tunnel_port"]
     logging.info("starting tcp tunnel at %s:%d forward to %s:%d" %
                  (_config['local_address'], _config['local_port'],
