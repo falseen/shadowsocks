@@ -67,6 +67,7 @@ import logging
 import struct
 import errno
 import random
+import time
 
 from shadowsocks import cryptor, eventloop, lru_cache, common, shell
 from shadowsocks.common import parse_header, pack_addr, onetimeauth_verify, \
@@ -128,6 +129,9 @@ class UDPRelay(object):
         server_socket.setblocking(False)
         self._server_socket = server_socket
         self._stat_callback = stat_callback
+        self.last_log_time = 0
+        self.log_list = []
+        self.log_print_time = 5
 
     def _get_a_server(self):
         server = self._config['server']
@@ -187,8 +191,13 @@ class UDPRelay(object):
         if header_result is None:
             return
         addrtype, dest_addr, dest_port, header_length = header_result
-        logging.info("udp data to %s:%d from %s:%d"
-                     % (dest_addr, dest_port, r_addr[0], r_addr[1]))
+        self.log_list.append( "udp data to %s:%d from %s:%d"
+                    % (dest_addr, dest_port, r_addr[0], r_addr[1]))
+        if time.time() - self.last_log_time > self.log_print_time:
+            self.last_log_time = time.time()
+            for x in set(self.log_list):
+                logging.info("%s [%s count]" %(x, self.log_list.count(x)))
+            self.log_list = []
         if self._is_local:
             server_addr, server_port = self._get_a_server()
         else:
